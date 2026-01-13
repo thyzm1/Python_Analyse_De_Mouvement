@@ -11,7 +11,7 @@ st.set_page_config(layout="wide", page_title="Analyse de Mouvement : Différence
 st.title("🏃‍♂️ Analyse de Mouvement par Différence Temporelle")
 st.markdown("""
 Cette interface implémente la méthode décrite dans la section **3.1 Méthode par Différence d’Images**.
-Elle compare l'image au temps $t$ avec l'image au temps $t-1$ pour isoler les pixels qui ont changé d'intensité.
+Elle compare deux images sélectionnées (Début et Fin) pour isoler les pixels qui ont changé d'intensité entre ces deux instants.
 """)
 
 # --- 1. GESTION DE LA VIDÉO ---
@@ -45,13 +45,22 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("2. Navigation Temporelle")
 
-# On commence à 1 car on a besoin de t-1
-frame_index = st.slider("Sélectionner l'instant t (Frame)", 1, total_frames - 1, 10)
+# Sélection directe de l'intervalle [t1, t2]
+t_start, t_end = st.slider(
+    "Sélectionner les frames à comparer (Début/Fin)",
+    min_value=0,
+    max_value=total_frames - 1,
+    value=(0, 10),
+    help="Choisissez deux instants dans la vidéo. La différence sera calculée entre ces deux frames."
+)
 
-# Lecture des images t et t-1
-cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index - 1)
+if t_start == t_end:
+    st.warning("Attention : Vous comparez la même frame avec elle-même. Le résultat sera noir.")
+
+# Lecture des images sélectionnées
+cap.set(cv2.CAP_PROP_POS_FRAMES, t_start)
 ret1, frame_prev_bgr = cap.read()
-cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
+cap.set(cv2.CAP_PROP_POS_FRAMES, t_end)
 ret2, frame_curr_bgr = cap.read()
 
 if not ret1 or not ret2:
@@ -86,16 +95,16 @@ if use_morphology:
 
 # --- 4. VISUALISATION DÉTAILLÉE ---
 
-st.subheader(f"Analyse à l'instant t = {frame_index}")
+st.subheader(f"Analyse entre t={t_start} et t={t_end} (Delta = {abs(t_end - t_start)} frames)")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.caption("Frame précédente (t-1)")
+    st.caption(f"Frame de Début (t={t_start})")
     st.image(frame_prev_gray, use_container_width=True, clamp=True)
 
 with col2:
-    st.caption("Frame actuelle (t)")
+    st.caption(f"Frame de Fin (t={t_end})")
     st.image(frame_curr_gray, use_container_width=True, clamp=True)
 
 st.markdown("---")
@@ -104,7 +113,7 @@ col3, col4 = st.columns(2)
 
 with col3:
     st.markdown("**1. Image de Différence Brute**")
-    st.markdown(r"$D(x,y) = |I_t(x,y) - I_{t-1}(x,y)|$")
+    st.markdown(r"$D(x,y) = |I_{t_{end}}(x,y) - I_{t_{start}}(x,y)|$")
     # On utilise une colormap 'inferno' pour mieux voir les faibles variations (bruit)
     fig_diff, ax_diff = plt.subplots()
     im = ax_diff.imshow(diff_img, cmap='inferno')
@@ -136,7 +145,7 @@ with st.expander("🔍 Analyse des limites (Basée sur Section 3.3 du rapport)")
         * Essayez de monter le seuil vers **100** : Les objets en mouvement s'effacent ou se morcellent.
     
     2.  **Problème des objets homogènes :**
-        * Si une voiture blanche passe, l'intérieur de son capot est uniforme. $Pixel(t) \\approx Pixel(t-1)$.
+        * Si une voiture blanche passe, l'intérieur de son capot est uniforme. $Pixel(t_{{end}}) \\approx Pixel(t_{{start}})$.
         * Résultat : Le centre de la voiture est noir (pas de mouvement détecté), seuls les contours (phares, pare-brise) sont blancs. On appelle ça l'effet **"fantôme"** ou "aperture problem".
     """)
 
